@@ -26,21 +26,38 @@ class CopyAPI:
         self.tree_expire = {}
         self.httpconn = urllib3.connection_from_url("https://next-api.copy.com", block=True, maxsize=1)
         data = {'username': username, 'password' : password}
+        #print "sending response"
+
         response = self.copyrequest('/auth_user', data)
+        #print "response" + str(response)
+
         if 'auth_token' not in response:
+            print "Authentication failed"
             raise FuseOSError(EPERM)
         else:
-            self.auth_token = response['auth_token'].encode('ascii','ignore')
+            self.auth_token = response['auth_token'].encode('utf-8','ignore')
+
+    def convert(self, input):
+        if isinstance(input, dict):
+            return {self.convert(key): self.convert(value) for key, value in input.iteritems()}
+        elif isinstance(input, list):
+            return [self.convert(element) for element in input]
+        elif isinstance(input, unicode):
+            return input.encode('utf-8')
+        else:
+            return input
 
     def copyrequest(self, uri, data, return_json=True):
         headers = self.headers
         if self.auth_token != '':
             headers['X-Authorization'] = self.auth_token
+
         response = self.httpconn.request_encode_body("POST", uri, {'data': json.dumps(data)}, headers, False)
+
         if return_json == True:
-            return json.loads(response.data, 'latin-1')
+            return self.convert(json.loads(response.data, "utf-8"))
         else:
-            return response.data
+            return self.convert(response.data)
 
     def part_request(self, method, parts, data=None):
         headers = self.headers
